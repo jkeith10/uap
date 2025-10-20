@@ -1,0 +1,231 @@
+# UAP Agent Manifest
+# Defines agent capabilities and configuration for the UAP system
+
+version: "1.0"
+namespace: "uap.dev"
+
+agents:
+  - id: "hvac-worker-1"
+    name: "HVAC Worker"
+    type: "worker"
+    version: "1.0.0"
+    description: "Specialized agent for HVAC optimization tasks"
+    
+    capabilities:
+      - "intent_processing"
+      - "intent_optimize"
+      - "domain_hvac"
+      - "action_execution"
+      - "result_processing"
+      - "pricing_analysis"
+      - "quote_generation"
+    
+    protocols:
+      - "rest"
+      - "websocket"
+      - "mcp"
+    
+    configuration:
+      cost_weight: 0.8
+      latency_weight: 0.9
+      confidence_weight: 0.95
+      timeout: 300
+      retry_count: 3
+    
+    endpoints:
+      rest: "http://localhost:8001/api"
+      websocket: "ws://localhost:8001/ws"
+      mcp: "http://localhost:8001/mcp"
+    
+    metadata:
+      domain: "hvac"
+      organization: "BellOps"
+      environment: "production"
+      tags: ["optimization", "pricing", "hvac"]
+
+  - id: "crm-analyzer-1"
+    name: "CRM Analyzer"
+    type: "analyzer"
+    version: "1.0.0"
+    description: "Analyzes CRM data for lead optimization"
+    
+    capabilities:
+      - "intent_processing"
+      - "intent_analyze"
+      - "domain_crm"
+      - "data_collection"
+      - "analysis"
+      - "lead_scoring"
+      - "customer_segmentation"
+    
+    protocols:
+      - "rest"
+      - "graphql"
+    
+    configuration:
+      cost_weight: 0.6
+      latency_weight: 0.8
+      confidence_weight: 0.9
+      timeout: 600
+      retry_count: 2
+    
+    endpoints:
+      rest: "http://localhost:8002/api"
+      graphql: "http://localhost:8002/graphql"
+    
+    metadata:
+      domain: "crm"
+      organization: "BellOps"
+      environment: "production"
+      tags: ["analysis", "crm", "leads"]
+
+  - id: "pricing-ai-1"
+    name: "Pricing AI"
+    type: "ai_model"
+    version: "1.0.0"
+    description: "AI model for pricing optimization and prediction"
+    
+    capabilities:
+      - "intent_processing"
+      - "intent_optimize"
+      - "domain_pricing"
+      - "ai_analysis"
+      - "prediction"
+      - "machine_learning"
+      - "regression_analysis"
+    
+    protocols:
+      - "rest"
+      - "grpc"
+      - "mcp"
+    
+    configuration:
+      cost_weight: 1.0
+      latency_weight: 0.7
+      confidence_weight: 0.85
+      timeout: 900
+      retry_count: 1
+    
+    endpoints:
+      rest: "http://localhost:8003/api"
+      grpc: "localhost:8004"
+      mcp: "http://localhost:8003/mcp"
+    
+    metadata:
+      domain: "pricing"
+      organization: "BellOps"
+      environment: "production"
+      tags: ["ai", "pricing", "ml", "prediction"]
+
+  - id: "workflow-engine-1"
+    name: "Workflow Engine"
+    type: "orchestrator"
+    version: "1.0.0"
+    description: "Orchestrates multi-step workflows and action graphs"
+    
+    capabilities:
+      - "workflow_orchestration"
+      - "action_graph_execution"
+      - "task_scheduling"
+      - "dependency_management"
+      - "error_handling"
+      - "retry_logic"
+    
+    protocols:
+      - "rest"
+      - "websocket"
+    
+    configuration:
+      cost_weight: 0.5
+      latency_weight: 0.6
+      confidence_weight: 0.95
+      timeout: 1800
+      retry_count: 5
+    
+    endpoints:
+      rest: "http://localhost:8005/api"
+      websocket: "ws://localhost:8005/ws"
+    
+    metadata:
+      domain: "orchestration"
+      organization: "BellOps"
+      environment: "production"
+      tags: ["workflow", "orchestration", "scheduling"]
+
+  - id: "memory-manager-1"
+    name: "Memory Manager"
+    type: "memory"
+    version: "1.0.0"
+    description: "Manages cross-session memory and reflection data"
+    
+    capabilities:
+      - "memory_storage"
+      - "memory_retrieval"
+      - "reflection_processing"
+      - "performance_analysis"
+      - "recommendation_generation"
+    
+    protocols:
+      - "rest"
+      - "websocket"
+    
+    configuration:
+      cost_weight: 0.3
+      latency_weight: 0.9
+      confidence_weight: 0.98
+      timeout: 120
+      retry_count: 3
+    
+    endpoints:
+      rest: "http://localhost:8006/api"
+      websocket: "ws://localhost:8006/ws"
+    
+    metadata:
+      domain: "memory"
+      organization: "BellOps"
+      environment: "production"
+      tags: ["memory", "reflection", "analytics"]
+
+# Global configuration
+global_config:
+  default_timeout: 300
+  max_retry_count: 3
+  health_check_interval: 30
+  performance_tracking: true
+  reflection_enabled: true
+  
+  routing:
+    algorithm: "weighted_scoring"
+    update_interval: 60
+    performance_window: 3600
+  
+  memory:
+    retention_policies:
+      ephemeral: "24h"
+      archived: "30d"
+      permanent: "forever"
+    
+    sync_interval: 300
+    cleanup_interval: 3600
+
+# Schema definitions
+schemas:
+  intent_packet:
+    version: "1.0"
+    description: "Standard intent packet schema"
+    required_fields: ["type", "goal", "priority"]
+    
+  action_graph:
+    version: "1.0"
+    description: "Action graph definition schema"
+    required_fields: ["name", "nodes", "edges"]
+    
+  memory_stream:
+    version: "1.0"
+    description: "Memory stream entry schema"
+    required_fields: ["stream_id", "actor", "intent"]
+    
+  reflection_report:
+    version: "1.0"
+    description: "Reflection report schema"
+    required_fields: ["report_id", "actor", "evaluation"]

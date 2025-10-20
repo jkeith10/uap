@@ -1,0 +1,34 @@
+# Global code owners
+* @maintainer1 @maintainer2
+
+# Core UAP components
+/src/uap/core/ @maintainer1
+/src/uap/aml/ @maintainer1 @maintainer2
+/src/uap/reflection/ @maintainer1 @maintainer2
+
+# Protocol bridges
+/src/uap/bridges/ @maintainer2
+
+# Storage layer
+/src/uap/storage/ @maintainer1
+
+# Transport layer
+/src/uap/transport/ @maintainer2
+
+# Configuration and utilities
+/src/uap/config.py @maintainer1
+/src/uap/exceptions.py @maintainer1
+/src/uap/logging_config.py @maintainer1
+
+# Documentation
+/docs/ @maintainer1 @maintainer2
+README.md @maintainer1 @maintainer2
+
+# CI/CD and project configuration
+/.github/ @maintainer1
+pyproject.toml @maintainer1
+docker-compose.yml @maintainer1
+Dockerfile @maintainer1
+
+# Tests
+/tests/ @maintainer1 @maintainer2
