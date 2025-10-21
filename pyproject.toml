@@ -1,10 +1,13 @@
 [tool.poetry]
 name = "uap"
-version = "0.1.0"
+version = "1.0.0"
 description = "Unified Autonomy Protocol - A cross-domain, self-optimizing protocol for intelligent system orchestration"
 authors = ["UAP Team"]
 readme = "README.md"
 packages = [{include = "uap", from = "src"}]
+
+[tool.poetry.scripts]
+uap = "uap.cli:main"
 
 [tool.poetry.dependencies]
 python = "^3.11"
