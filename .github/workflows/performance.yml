@@ -1,0 +1,86 @@
+name: Performance Testing
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: uap_test
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+      
+      redis:
+        image: redis:7
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+    
+    - name: Install dependencies
+      run: poetry install
+    
+    - name: Start UAP server
+      run: |
+        poetry run uvicorn src.uap.main:app --host 0.0.0.0 --port 8000 &
+        sleep 10
+      env:
+        UAP_DATABASE__HOST: localhost
+        UAP_DATABASE__PASSWORD: postgres
+        UAP_REDIS__HOST: localhost
+    
+    - name: Run benchmarks
+      run: |
+        poetry run python benchmarks/bench_api.py
+        poetry run python benchmarks/bench_memory.py
+    
+    - name: Run load tests
+      run: |
+        poetry run locust -f benchmarks/locustfile.py --headless \
+          --users 10 --spawn-rate 2 --run-time 1m \
+          --host http://localhost:8000 \
+          --html benchmarks/locust_report.html
+    
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      with:
+        name: benchmark-results
+        path: |
+          benchmarks/benchmark_report.txt
+          benchmarks/locust_report.html
+    
+    - name: Check for performance regression
+      run: |
+        poetry run python scripts/check_performance_regression.py
+      continue-on-error: true
+

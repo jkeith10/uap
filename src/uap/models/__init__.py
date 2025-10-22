@@ -2,8 +2,8 @@
 
 from .intent import IntentPacket, IntentType
 from .action_graph import ActionGraph, ActionNode, ActionEdge, GraphStatus
-from .memory_stream import MemoryStream, MemoryGranularity, RetentionPolicy
-from .reflection import ReflectionReport, EvaluationResult
+from .memory_stream import MemoryStream, MemoryGranularity, RetentionPolicy, MemoryQuery
+from .reflection import ReflectionReport, EvaluationResult, ReflectionQuery
 
 __all__ = [
     "IntentPacket",
@@ -15,6 +15,8 @@ __all__ = [
     "MemoryStream",
     "MemoryGranularity",
     "RetentionPolicy",
+    "MemoryQuery",
     "ReflectionReport",
     "EvaluationResult",
+    "ReflectionQuery",
 ]
