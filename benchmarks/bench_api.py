@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from uap.client import AsyncUAPClient
-from uap.models.intent import IntentPacket, IntentType, IntentPriority
+from uap.models.intent import IntentPacket, IntentType
 
 
 class APIBenchmark:
@@ -33,10 +33,9 @@ class APIBenchmark:
         async with AsyncUAPClient(self.base_url) as client:
             for i in range(iterations):
                 intent = IntentPacket(
-                    type=IntentType.ACTION,
-                    content=f"Benchmark intent {i}",
-                    context={"iteration": i},
-                    priority=IntentPriority.MEDIUM
+                    type=IntentType.OPTIMIZE,
+                    goal=f"Benchmark intent {i}",
+                    priority=0.5
                 )
                 
                 start = time.perf_counter()
@@ -76,10 +75,9 @@ class APIBenchmark:
         
         async def create_intent(client: AsyncUAPClient, i: int):
             intent = IntentPacket(
-                type=IntentType.ACTION,
-                content=f"Concurrent intent {i}",
-                context={"iteration": i},
-                priority=IntentPriority.MEDIUM
+                type=IntentType.OPTIMIZE,
+                goal=f"Concurrent intent {i}",
+                priority=0.5
             )
             
             start = time.perf_counter()
