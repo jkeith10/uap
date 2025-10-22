@@ -4,8 +4,14 @@ import pytest
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from src.uap.aml.packets import UAPContextPacket, PacketType, ProtocolType
-from src.uap.aml.routing import SelfRoutingEngine, CapabilityFingerprint, RoutingScore
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
+from uap.aml.packets import UAPContextPacket, PacketType, ProtocolType
+from uap.aml.routing import SelfRoutingEngine, CapabilityFingerprint, RoutingScore
 
 
 class TestUAPContextPacket:

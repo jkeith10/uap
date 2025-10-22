@@ -4,10 +4,16 @@ import pytest
 from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
-from src.uap.client.async_client import AsyncUAPClient
-from src.uap.client.sync_client import UAPClient
-from src.uap.client.exceptions import UAPClientError
-from src.uap.models.intent import IntentPacket, IntentType, IntentPriority
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
+from uap.client.async_client import AsyncUAPClient
+from uap.client.sync_client import UAPClient
+from uap.client.exceptions import UAPClientError
+from uap.models.intent import IntentPacket, IntentType, IntentPriority
 
 
 class TestAsyncUAPClient:

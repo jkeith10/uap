@@ -11,276 +11,226 @@ from ..models.memory_stream import MemoryStream
 from ..models.reflection import ReflectionReport
 from ..aml.packets import UAPContextPacket, PacketType, ProtocolType
 
+# Create FastAPI app instance
+app = FastAPI(
+    title="UAP REST API",
+    description="REST API endpoints for UAP",
+    version="0.1.0"
+)
 
-class UAPAPI:
-    """UAP REST API"""
-    
-    def __init__(
-        self,
-        world_state_manager,
-        event_system,
-        mediator,
-        memory_bus,
-        routing_engine
-    ):
-        self.world_state_manager = world_state_manager
-        self.event_system = event_system
-        self.mediator = mediator
-        self.memory_bus = memory_bus
-        self.routing_engine = routing_engine
-    
-    async def submit_intent(self, intent: IntentPacket) -> Dict[str, Any]:
-        """Submit an intent for processing"""
-        try:
-            # Create UAP context packet
-            packet = UAPContextPacket(
-                type=PacketType.INTENT,
-                source_protocol=ProtocolType.REST,
-                target_protocol=ProtocolType.REST,
-                source_node="api-gateway",
-                target_node="intent-processor",
-                payload=intent.dict(),
-                correlation_id=str(intent.id)
-            )
-            
-            # Process through mediator
-            result = await self.mediator.process_packet(packet)
-            
-            # Publish event
-            await self.event_system.create_event(
-                event_type="intent.created",
-                source="api-gateway",
-                data={"intent_id": str(intent.id), "result": result.payload}
-            )
-            
-            return {
-                "status": "success",
-                "intent_id": str(intent.id),
-                "result": result.payload
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    async def create_action_graph(self, graph: ActionGraph) -> Dict[str, Any]:
-        """Create an action graph"""
-        try:
-            # Validate graph
-            errors = graph.validate_graph()
-            if errors:
-                raise HTTPException(status_code=400, detail=f"Graph validation errors: {errors}")
-            
-            # Store in PostgreSQL
-            graph_id = await self.world_state_manager.postgres_client.create_action_graph(
-                graph_id=str(graph.id),
-                name=graph.name,
-                definition=graph.to_dag_format(),
-                status=graph.status.value
-            )
-            
-            return {
-                "status": "success",
-                "graph_id": graph_id,
-                "graph": graph.dict()
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    async def get_action_graph(self, graph_id: str) -> Dict[str, Any]:
-        """Get an action graph"""
-        try:
-            graph_data = await self.world_state_manager.postgres_client.get_action_graph(graph_id)
-            if not graph_data:
-                raise HTTPException(status_code=404, detail="Action graph not found")
-            
-            return {
-                "status": "success",
-                "graph": graph_data
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    async def query_memories(self, query: MemoryQuery) -> Dict[str, Any]:
-        """Query memory streams"""
-        try:
-            memories = await self.memory_bus.query_memories(query)
-            
-            return {
-                "status": "success",
-                "memories": [memory.dict() for memory in memories],
-                "count": len(memories)
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    async def get_reflection_reports(self, query: ReflectionQuery) -> Dict[str, Any]:
-        """Get reflection reports"""
-        try:
-            reports = await self.world_state_manager.postgres_client.get_reflection_reports(
-                actor=query.actors[0] if query.actors else None,
-                limit=query.limit,
-                offset=query.offset
-            )
-            
-            return {
-                "status": "success",
-                "reports": reports,
-                "count": len(reports)
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    async def get_node_capabilities(self, node_id: Optional[str] = None) -> Dict[str, Any]:
-        """Get node capabilities"""
-        try:
-            if node_id:
-                capabilities = await self.routing_engine.get_node_capabilities(node_id)
-                return {
-                    "status": "success",
-                    "capabilities": capabilities.__dict__ if capabilities else None
-                }
-            else:
-                nodes = await self.routing_engine.get_available_nodes()
-                return {
-                    "status": "success",
-                    "nodes": nodes
-                }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
-    
-    async def get_system_stats(self) -> Dict[str, Any]:
-        """Get system statistics"""
-        try:
-            memory_stats = await self.memory_bus.get_memory_stats()
-            routing_stats = await self.routing_engine.get_routing_stats()
-            
-            return {
-                "status": "success",
-                "memory": memory_stats,
-                "routing": routing_stats,
-                "timestamp": "2024-01-01T10:00:00Z"
-            }
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=str(e))
+# Global instances (will be injected)
+world_state_manager = None
+event_system = None
+mediator = None
+memory_bus = None
+routing_engine = None
 
 
-def create_app(
-    world_state_manager,
-    event_system,
-    mediator,
-    memory_bus,
-    routing_engine
-) -> FastAPI:
-    """Create FastAPI application"""
-    
-    app = FastAPI(
-        title="Unified Autonomy Protocol (UAP)",
-        description="A cross-domain, self-optimizing protocol for intelligent system orchestration",
-        version="0.1.0"
-    )
-    
-    # Add CORS middleware
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
-    
-    # Initialize API
-    api = UAPAPI(
-        world_state_manager,
-        event_system,
-        mediator,
-        memory_bus,
-        routing_engine
-    )
-    
-    # Intent endpoints
-    @app.post("/intent")
-    async def submit_intent(intent: IntentPacket):
-        return await api.submit_intent(intent)
-    
-    @app.get("/intent/{intent_id}")
-    async def get_intent(intent_id: str):
-        # Implementation would retrieve intent from storage
-        return {"status": "success", "intent_id": intent_id}
-    
-    # Action graph endpoints
-    @app.post("/graph")
-    async def create_action_graph(graph: ActionGraph):
-        return await api.create_action_graph(graph)
-    
-    @app.get("/graph/{graph_id}")
-    async def get_action_graph(graph_id: str):
-        return await api.get_action_graph(graph_id)
-    
-    @app.get("/graph")
-    async def list_action_graphs():
-        # Implementation would list all graphs
-        return {"status": "success", "graphs": []}
-    
-    # Memory endpoints
-    @app.post("/memory/query")
-    async def query_memories(query: MemoryQuery):
-        return await api.query_memories(query)
-    
-    @app.get("/memory/stream/{stream_id}")
-    async def get_stream_memories(stream_id: str, limit: int = 100, offset: int = 0):
-        memories = await api.memory_bus.get_stream_memories(stream_id, limit, offset)
+async def submit_intent(intent: IntentPacket) -> Dict[str, Any]:
+    """Submit an intent for processing"""
+    try:
+        # Create UAP context packet
+        packet = UAPContextPacket(
+            type=PacketType.INTENT,
+            source_protocol=ProtocolType.REST,
+            target_protocol=ProtocolType.REST,
+            source_node="api-gateway",
+            target_node="intent-processor",
+            payload=intent.dict(),
+            correlation_id=str(intent.id)
+        )
+        
+        # Process through mediator
+        result = await mediator.process_packet(packet)
+        
+        # Publish event
+        await event_system.create_event(
+            event_type="intent.created",
+            source="api-gateway",
+            data={"intent_id": str(intent.id), "result": result.payload}
+        )
+        
+        # Store in world state
+        await world_state_manager.set_state(
+            f"intent:{intent.id}",
+            intent.dict(),
+            ttl=3600
+        )
+        
         return {
             "status": "success",
-            "memories": [memory.dict() for memory in memories],
-            "count": len(memories)
+            "intent_id": str(intent.id),
+            "result": result.payload
         }
-    
-    # Reflection endpoints
-    @app.post("/reflect/query")
-    async def get_reflection_reports(query: ReflectionQuery):
-        return await api.get_reflection_reports(query)
-    
-    @app.get("/reflect/{report_id}")
-    async def get_reflection_report(report_id: str):
-        # Implementation would retrieve specific report
-        return {"status": "success", "report_id": report_id}
-    
-    # Node endpoints
-    @app.get("/nodes")
-    async def get_nodes():
-        return await api.get_node_capabilities()
-    
-    @app.get("/nodes/{node_id}")
-    async def get_node(node_id: str):
-        return await api.get_node_capabilities(node_id)
-    
-    @app.post("/nodes/{node_id}/register")
-    async def register_node(node_id: str, capabilities: Dict[str, Any]):
-        # Implementation would register node
-        return {"status": "success", "node_id": node_id}
-    
-    # System endpoints
-    @app.get("/health")
-    async def health_check():
-        return {"status": "healthy", "timestamp": "2024-01-01T10:00:00Z"}
-    
-    @app.get("/stats")
-    async def get_system_stats():
-        return await api.get_system_stats()
-    
-    # WebSocket endpoint
-    @app.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket):
-        await websocket.accept()
-        try:
-            while True:
-                data = await websocket.receive_text()
-                # Echo back the data
-                await websocket.send_text(f"Echo: {data}")
-        except WebSocketDisconnect:
-            pass
-    
-    return app
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def get_intent(intent_id: str) -> Dict[str, Any]:
+    """Get an intent by ID"""
+    try:
+        state = await world_state_manager.get_state(f"intent:{intent_id}")
+        if not state:
+            raise HTTPException(status_code=404, detail="Intent not found")
+        
+        return {
+            "status": "success",
+            "intent": state
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def create_action_graph(graph: ActionGraph) -> Dict[str, Any]:
+    """Create an action graph"""
+    try:
+        # Validate graph
+        errors = graph.validate_graph()
+        if errors:
+            raise HTTPException(status_code=400, detail=f"Graph validation failed: {errors}")
+        
+        # Store in world state
+        await world_state_manager.set_state(
+            f"graph:{graph.id}",
+            graph.dict(),
+            ttl=7200
+        )
+        
+        return {
+            "status": "success",
+            "graph_id": str(graph.id),
+            "graph": graph.dict()
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def get_action_graph(graph_id: str) -> Dict[str, Any]:
+    """Get an action graph by ID"""
+    try:
+        state = await world_state_manager.get_state(f"graph:{graph_id}")
+        if not state:
+            raise HTTPException(status_code=404, detail="Action graph not found")
+        
+        return {
+            "status": "success",
+            "graph": state
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def store_memory(memory: MemoryStream) -> Dict[str, Any]:
+    """Store a memory stream"""
+    try:
+        # Store in memory bus
+        await memory_bus.store_memory(memory)
+        
+        return {
+            "status": "success",
+            "memory_id": str(memory.stream_id),
+            "memory": memory.dict()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def query_memory(query: MemoryQuery) -> List[Dict[str, Any]]:
+    """Query memory streams"""
+    try:
+        # Query memory bus
+        results = await memory_bus.query_memory(query)
+        
+        return {
+            "status": "success",
+            "memories": [memory.dict() for memory in results],
+            "count": len(results)
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def generate_reflection(query: ReflectionQuery) -> ReflectionReport:
+    """Generate a reflection report"""
+    try:
+        # Generate reflection
+        reflection = await memory_bus.generate_reflection(query)
+        
+        return {
+            "status": "success",
+            "reflection": reflection.dict()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+async def get_system_status() -> Dict[str, Any]:
+    """Get system status"""
+    try:
+        return {
+            "status": "healthy",
+            "world_state": await world_state_manager.get_all_states(),
+            "memory_stats": await memory_bus.get_stats(),
+            "routing_stats": await routing_engine.get_stats()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# Add routes to the FastAPI app
+@app.post("/api/v1/intents", response_model=Dict[str, Any])
+async def create_intent_endpoint(intent: IntentPacket):
+    """Create a new intent"""
+    return await submit_intent(intent)
+
+
+@app.get("/api/v1/intents/{intent_id}", response_model=Dict[str, Any])
+async def get_intent_endpoint(intent_id: str):
+    """Get an intent by ID"""
+    return await get_intent(intent_id)
+
+
+@app.post("/api/v1/graphs", response_model=Dict[str, Any])
+async def create_graph_endpoint(graph: ActionGraph):
+    """Create a new action graph"""
+    return await create_action_graph(graph)
+
+
+@app.get("/api/v1/graphs/{graph_id}", response_model=Dict[str, Any])
+async def get_graph_endpoint(graph_id: str):
+    """Get an action graph by ID"""
+    return await get_action_graph(graph_id)
+
+
+@app.post("/api/v1/memory", response_model=Dict[str, Any])
+async def store_memory_endpoint(memory: MemoryStream):
+    """Store a memory stream"""
+    return await store_memory(memory)
+
+
+@app.post("/api/v1/memory/query", response_model=Dict[str, Any])
+async def query_memory_endpoint(query: MemoryQuery):
+    """Query memory streams"""
+    return await query_memory(query)
+
+
+@app.post("/api/v1/reflections", response_model=Dict[str, Any])
+async def generate_reflection_endpoint(query: ReflectionQuery):
+    """Generate a reflection report"""
+    return await generate_reflection(query)
+
+
+@app.get("/api/v1/status", response_model=Dict[str, Any])
+async def get_status_endpoint():
+    """Get system status"""
+    return await get_system_status()
 
 
 if __name__ == "__main__":
-    uvicorn.run("rest_api:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run(app, host="0.0.0.0", port=8000)

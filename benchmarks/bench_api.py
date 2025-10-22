@@ -7,8 +7,14 @@ import time
 from statistics import mean, median, stdev
 from typing import List, Dict, Any
 
-from src.uap.client import AsyncUAPClient
-from src.uap.models.intent import IntentPacket, IntentType, IntentPriority
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from uap.client import AsyncUAPClient
+from uap.models.intent import IntentPacket, IntentType, IntentPriority
 
 
 class APIBenchmark:

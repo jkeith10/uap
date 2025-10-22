@@ -4,10 +4,16 @@ import pytest
 from datetime import datetime, timezone
 from unittest.mock import AsyncMock, MagicMock
 
-from src.uap.core.kernel import WorldStateManager, WorldStateEntry
-from src.uap.core.events import EventSystem, Event, EventType, EventHook
-from src.uap.core.versioning import SemanticVersion, VersionManager, VersionedObject, VersionType
-from src.uap.core.schema import UAPContext, UAPSchemaValidator
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
+from uap.core.kernel import WorldStateManager, WorldStateEntry
+from uap.core.events import EventSystem, Event, EventType, EventHook
+from uap.core.versioning import SemanticVersion, VersionManager, VersionedObject, VersionType
+from uap.core.schema import UAPContext, UAPSchemaValidator
 
 
 class TestSemanticVersion:

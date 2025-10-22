@@ -3,8 +3,14 @@
 import pytest
 from datetime import datetime, timezone
 
-from src.uap.reflection.critic import OutcomeCritic, OutcomeMetrics
-from src.uap.reflection.optimizer import RoutingOptimizer, OptimizationRecommendation
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "src"))
+
+from uap.reflection.critic import OutcomeCritic, OutcomeMetrics
+from uap.reflection.optimizer import RoutingOptimizer, OptimizationRecommendation
 
 
 class TestOutcomeCritic:

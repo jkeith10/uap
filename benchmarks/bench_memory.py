@@ -7,8 +7,14 @@ import time
 from statistics import mean, median
 from typing import List
 
-from src.uap.storage.redis_client import RedisClient, RedisConfig
-from src.uap.storage.postgres_client import PostgreSQLClient, PostgreSQLConfig
+import sys
+from pathlib import Path
+
+# Add src to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
+
+from uap.storage.redis_client import RedisClient, RedisConfig
+from uap.storage.postgres_client import PostgreSQLClient, PostgreSQLConfig
 
 
 async def benchmark_redis_operations():
