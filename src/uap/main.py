@@ -1,197 +1,168 @@
-"""UAP Main Application"""
+"""UAP main application entry point"""
 
-import asyncio
-import logging
-from typing import Dict, Any
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
+import structlog
 
-from .core import WorldStateManager, EventSystem, VersionManager
-from .aml import ProtocolMediator, SelfRoutingEngine, DriverRegistry, DelegateRegistry
-from .storage import RedisClient, PostgreSQLClient, MemoryBus
-from .transport.rest_api import create_app
+from .transport.rest_api import app as rest_app
 from .transport.websocket import WebSocketManager
+from .storage.redis_client import RedisClient, RedisConfig
+from .storage.postgres_client import PostgreSQLClient, PostgreSQLConfig
+from .core.events import EventSystem
+from .core.kernel import WorldStateManager
+
+# Configure structured logging
+structlog.configure(
+    processors=[
+        structlog.stdlib.filter_by_level,
+        structlog.stdlib.add_logger_name,
+        structlog.stdlib.add_log_level,
+        structlog.stdlib.PositionalArgumentsFormatter(),
+        structlog.processors.TimeStamper(fmt="iso"),
+        structlog.processors.StackInfoRenderer(),
+        structlog.processors.format_exc_info,
+        structlog.processors.UnicodeDecoder(),
+        structlog.processors.JSONRenderer()
+    ],
+    context_class=dict,
+    logger_factory=structlog.stdlib.LoggerFactory(),
+    wrapper_class=structlog.stdlib.BoundLogger,
+    cache_logger_on_first_use=True,
+)
+
+logger = structlog.get_logger(__name__)
+
+# Global instances
+redis_client = None
+postgres_client = None
+event_system = None
+world_state_manager = None
+websocket_manager = None
 
 
-class UAPApplication:
-    """Main UAP application"""
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Application lifespan manager"""
+    global redis_client, postgres_client, event_system, world_state_manager, websocket_manager
     
-    def __init__(self, config: Dict[str, Any]):
-        self.config = config
-        self.logger = logging.getLogger(__name__)
-        
-        # Initialize components
-        self.redis_client = RedisClient(config["redis"])
-        self.postgres_client = PostgreSQLClient(config["postgres"])
-        self.memory_bus = MemoryBus(self.redis_client, self.postgres_client)
-        
-        self.world_state_manager = WorldStateManager(
-            self.redis_client,
-            self.postgres_client
-        )
-        
-        self.event_system = EventSystem()
-        self.version_manager = VersionManager()
-        
-        self.routing_engine = SelfRoutingEngine(self.postgres_client)
-        self.driver_registry = DriverRegistry()
-        self.delegate_registry = DelegateRegistry()
-        
-        self.mediator = ProtocolMediator(
-            self.routing_engine,
-            self.driver_registry,
-            self.delegate_registry
-        )
-        
-        self.websocket_manager = WebSocketManager()
-        
-        # FastAPI app
-        self.app = create_app(
-            world_state_manager=self.world_state_manager,
-            event_system=self.event_system,
-            mediator=self.mediator,
-            memory_bus=self.memory_bus,
-            routing_engine=self.routing_engine
-        )
+    logger.info("Starting UAP application")
     
-    async def start(self) -> None:
-        """Start the UAP application"""
-        self.logger.info("Starting UAP application...")
+    try:
+        # Initialize Redis client
+        redis_config = RedisConfig()
+        redis_client = RedisClient(redis_config)
+        await redis_client.connect()
+        logger.info("Redis client connected")
         
-        # Connect to storage
-        await self.redis_client.connect()
-        await self.postgres_client.connect()
+        # Initialize PostgreSQL client
+        postgres_config = PostgreSQLConfig()
+        postgres_client = PostgreSQLClient(postgres_config)
+        await postgres_client.connect()
+        logger.info("PostgreSQL client connected")
         
-        # Start core components
-        await self.memory_bus.start()
-        await self.world_state_manager.start()
-        await self.event_system.start()
-        await self.mediator.start()
+        # Initialize event system
+        event_system = EventSystem()
+        await event_system.start()
+        logger.info("Event system started")
         
-        # Connect adapters
-        await self.driver_registry.connect_all()
-        await self.delegate_registry.connect_all()
+        # Initialize world state manager
+        world_state_manager = WorldStateManager(redis_client, postgres_client)
+        logger.info("World state manager initialized")
         
-        # Register default nodes
-        await self._register_default_nodes()
+        # Initialize WebSocket manager
+        websocket_manager = WebSocketManager()
+        logger.info("WebSocket manager initialized")
         
-        self.logger.info("UAP application started successfully")
-    
-    async def stop(self) -> None:
-        """Stop the UAP application"""
-        self.logger.info("Stopping UAP application...")
+        yield
         
-        # Stop core components
-        await self.mediator.stop()
-        await self.event_system.stop()
-        await self.world_state_manager.stop()
-        await self.memory_bus.stop()
+    except Exception as e:
+        logger.error("Failed to start UAP application", error=str(e))
+        raise
+    finally:
+        # Cleanup
+        logger.info("Shutting down UAP application")
         
-        # Disconnect adapters
-        await self.delegate_registry.disconnect_all()
-        await self.driver_registry.disconnect_all()
+        if websocket_manager:
+            await websocket_manager.disconnect()
+            logger.info("WebSocket manager disconnected")
         
-        # Disconnect from storage
-        await self.postgres_client.disconnect()
-        await self.redis_client.disconnect()
+        if event_system:
+            await event_system.stop()
+            logger.info("Event system stopped")
         
-        self.logger.info("UAP application stopped")
-    
-    async def _register_default_nodes(self) -> None:
-        """Register default nodes"""
-        # Register HVAC Worker node
-        await self.routing_engine.register_node(
-            node_id="hvac-worker-1",
-            name="HVAC Worker",
-            capabilities=[
-                "intent_processing",
-                "intent_optimize",
-                "domain_hvac",
-                "action_execution",
-                "result_processing"
-            ],
-            cost_weight=0.8,
-            latency_weight=0.9,
-            confidence_weight=0.95
-        )
+        if world_state_manager:
+            await world_state_manager.cleanup()
+            logger.info("World state manager cleaned up")
         
-        # Register CRM Analyzer node
-        await self.routing_engine.register_node(
-            node_id="crm-analyzer-1",
-            name="CRM Analyzer",
-            capabilities=[
-                "intent_processing",
-                "intent_analyze",
-                "domain_crm",
-                "data_collection",
-                "analysis"
-            ],
-            cost_weight=0.6,
-            latency_weight=0.8,
-            confidence_weight=0.9
-        )
+        if postgres_client:
+            await postgres_client.disconnect()
+            logger.info("PostgreSQL client disconnected")
         
-        # Register Pricing AI node
-        await self.routing_engine.register_node(
-            node_id="pricing-ai-1",
-            name="Pricing AI",
-            capabilities=[
-                "intent_processing",
-                "intent_optimize",
-                "domain_pricing",
-                "ai_analysis",
-                "prediction"
-            ],
-            cost_weight=1.0,
-            latency_weight=0.7,
-            confidence_weight=0.85
-        )
-        
-        self.logger.info("Default nodes registered")
+        if redis_client:
+            await redis_client.disconnect()
+            logger.info("Redis client disconnected")
 
 
-def create_uap_app(config: Dict[str, Any]) -> UAPApplication:
-    """Create a UAP application instance"""
-    return UAPApplication(config)
+# Create FastAPI app
+app = FastAPI(
+    title="Unified Autonomy Protocol (UAP)",
+    description="Cross-domain, self-optimizing protocol for intelligent system orchestration",
+    version="0.1.0",
+    lifespan=lifespan
+)
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Configure appropriately for production
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# Include REST API routes
+app.include_router(rest_app.router)
+
+# Add WebSocket endpoint
+@app.websocket("/ws")
+async def websocket_endpoint(websocket):
+    """WebSocket endpoint for real-time communication"""
+    if websocket_manager:
+        await websocket_manager.handle_connection(websocket)
+    else:
+        await websocket.close(code=1011, reason="WebSocket manager not available")
 
 
-# Default configuration
-DEFAULT_CONFIG = {
-    "redis": {
-        "host": "localhost",
-        "port": 6379,
-        "db": 0,
-        "password": None,
-        "max_connections": 10
-    },
-    "postgres": {
-        "host": "localhost",
-        "port": 5432,
-        "database": "uap",
-        "user": "uap",
-        "password": "uap_password",
-        "min_size": 5,
-        "max_size": 20
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    """Health check endpoint"""
+    return {
+        "status": "healthy",
+        "version": "0.1.0",
+        "services": {
+            "redis": redis_client.is_connected() if redis_client else False,
+            "postgres": postgres_client.is_connected() if postgres_client else False,
+            "events": event_system.is_running() if event_system else False,
+            "websocket": websocket_manager is not None
+        }
     }
-}
+
+
+# Metrics endpoint
+@app.get("/metrics")
+async def metrics():
+    """Prometheus metrics endpoint"""
+    # TODO: Implement actual metrics collection
+    return {
+        "intents_created": 0,
+        "graphs_executed": 0,
+        "memory_operations": 0,
+        "active_connections": websocket_manager.connection_count() if websocket_manager else 0
+    }
 
 
 if __name__ == "__main__":
-    # Configure logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
-    )
-    
-    # Create and run application
-    app = create_uap_app(DEFAULT_CONFIG)
-    
-    async def main():
-        await app.start()
-        try:
-            # Keep running
-            await asyncio.sleep(float('inf'))
-        except KeyboardInterrupt:
-            pass
-        finally:
-            await app.stop()
-    
-    asyncio.run(main())
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8000)

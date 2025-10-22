@@ -8,7 +8,7 @@ from datetime import datetime, timezone
 from enum import Enum
 from dataclasses import dataclass, field
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from ..logging_config import core_logger
 
 
@@ -34,9 +34,9 @@ class EventType(str, Enum):
 @dataclass
 class Event:
     """Event structure"""
+    type: EventType
+    source: str
     id: UUID = field(default_factory=uuid4)
-    type: EventType = field()
-    source: str = field()
     data: Dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     correlation_id: Optional[str] = field(default=None)
